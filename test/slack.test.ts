@@ -46,7 +46,7 @@ describe("buildEntryBlocks", () => {
 describe("splitIntoMessages", () => {
   it("50 ブロックを超えないように記事の区切りで分割する", () => {
     const blocks = buildDigestBlocks({
-      date: new Date("2026-09-28T00:00:00Z"), days: 7, intro: "導入",
+      date: "2026-09-27", intro: "導入",
       entries: Array.from({ length: 30 }, (_, i) => entry(i)),
     });
     const messages = splitIntoMessages(blocks);

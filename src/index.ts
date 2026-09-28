@@ -1,11 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { loadConfig } from "./config.js";
+import { dayRangeJst, previousDateJst } from "./dates.js";
 import { clip, extractArticle } from "./extract.js";
+import { buildDigestMarkdown, writeDigestMarkdown } from "./markdown.js";
 import { fetchRecentRaindrops, type Raindrop } from "./raindrop.js";
 import { buildDigestBlocks, buildFallbackText, postToSlack, splitIntoMessages, type DigestEntry } from "./slack.js";
 import { Summarizer } from "./summarize.js";
 
 const CONCURRENCY = 3;
+const OUTPUT_DIR = "digests";
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results = new Array<R>(items.length);
@@ -62,17 +65,18 @@ async function buildEntry(summarizer: Summarizer, item: Raindrop): Promise<Diges
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const now = new Date();
-  const since = new Date(now.getTime() - config.digestDays * 24 * 60 * 60 * 1000);
+  const date = config.digestDate ?? previousDateJst(new Date());
+  const { since, until } = dayRangeJst(date);
 
   const raindrops = await fetchRecentRaindrops({
     token: config.raindropToken,
     collectionId: config.collectionId,
     since,
+    until,
     tag: config.tag,
     limit: config.maxArticles,
   });
-  console.log(`${since.toISOString()} 以降のブックマーク: ${raindrops.length} 件`);
+  console.log(`${date}(JST)のブックマーク: ${raindrops.length} 件`);
 
   if (raindrops.length === 0) {
     console.log("紹介する記事がないため投稿をスキップします");
@@ -91,13 +95,18 @@ async function main(): Promise<void> {
     console.warn("導入文の生成に失敗しました(導入文なしで投稿します)", error);
   }
 
-  const digest = { date: now, days: config.digestDays, intro, entries };
+  const digest = { date, intro, entries };
   const messages = splitIntoMessages(buildDigestBlocks(digest));
 
   if (config.dryRun) {
+    console.log(buildDigestMarkdown(digest));
     console.log(JSON.stringify(messages, null, 2));
     return;
   }
+
+  // Slack への投稿が失敗してもアーカイブは残るよう、先にファイルへ書き出す
+  const filePath = await writeDigestMarkdown(OUTPUT_DIR, digest);
+  console.log(`Markdown を書き出しました: ${filePath}`);
 
   await postToSlack(config.slackWebhookUrl, buildFallbackText(digest), messages);
   console.log(`Slack に投稿しました(${messages.length} メッセージ)`);

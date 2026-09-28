@@ -18,8 +18,8 @@ export interface DigestEntry {
 }
 
 export interface Digest {
-  date: Date;
-  days: number;
+  /** 対象日(日本時間, YYYY-MM-DD) */
+  date: string;
   intro: string | null;
   entries: DigestEntry[];
 }
@@ -38,13 +38,9 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+/** YYYY-MM-DD を YYYY/MM/DD にする */
+export function formatDate(date: string): string {
+  return date.replaceAll("-", "/");
 }
 
 export function buildEntryBlocks(entry: DigestEntry, index: number): Block[] {
@@ -80,7 +76,7 @@ export function buildDigestBlocks(digest: Digest): Block[] {
       elements: [
         {
           type: "mrkdwn",
-          text: `直近 ${digest.days} 日間に Raindrop へストックした記事 ${digest.entries.length} 本を紹介します`,
+          text: `${formatDate(digest.date)} に Raindrop へストックした記事 ${digest.entries.length} 本を紹介します`,
         },
       ],
     },
