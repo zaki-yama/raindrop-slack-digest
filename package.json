@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/zaki-yama/raindrop-slack-digest#readme",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
+    "@anthropic-ai/claude-code": "^2.1.284",
     "@mozilla/readability": "^0.6.0",
     "linkedom": "^0.18.13",
     "zod": "^4.6.5"

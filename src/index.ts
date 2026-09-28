@@ -1,13 +1,13 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { loadConfig } from "./config.js";
 import { dayRangeJst, previousDateJst } from "./dates.js";
 import { clip, extractArticle } from "./extract.js";
 import { buildDigestMarkdown, writeDigestMarkdown } from "./markdown.js";
 import { fetchRecentRaindrops, type Raindrop } from "./raindrop.js";
 import { buildDigestBlocks, buildFallbackText, postToSlack, splitIntoMessages, type DigestEntry } from "./slack.js";
-import { Summarizer } from "./summarize.js";
+import { summarizeArticle, writeIntro } from "./summarize.js";
 
-const CONCURRENCY = 3;
+/** 同時に動かす Claude Code の数。サブスクリプションの利用上限に配慮して控えめにする */
+const CONCURRENCY = 2;
 const OUTPUT_DIR = "digests";
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -23,23 +23,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-/**
- * 認証エラーやクレジット不足など、リクエストを変えても解消しない API エラーか。
- * これらは全記事で同じように失敗するので、抜粋だけの不完全なダイジェストを配信せずに処理を止める。
- * (429 や 5xx は SDK が自動でリトライし、それでも失敗した記事だけ抜粋にフォールバックする)
- */
-function isFatalApiError(error: unknown): boolean {
-  return (
-    error instanceof Anthropic.APIError &&
-    error.status !== undefined &&
-    error.status >= 400 &&
-    error.status < 500 &&
-    error.status !== 408 &&
-    error.status !== 429
-  );
-}
-
-async function buildEntry(summarizer: Summarizer, item: Raindrop): Promise<DigestEntry> {
+async function buildEntry(item: Raindrop): Promise<DigestEntry> {
   const entry: DigestEntry = {
     title: item.title,
     url: item.link,
@@ -58,22 +42,19 @@ async function buildEntry(summarizer: Summarizer, item: Raindrop): Promise<Diges
     console.warn(`本文が長いため先頭 ${extracted.text.length} 文字のみ要約に使用: ${item.link}`);
   }
 
-  try {
-    const summary = await summarizer.summarizeArticle({
-      title: item.title,
-      url: item.link,
-      domain: item.domain,
-      tags: item.tags,
-      note: item.note,
-      body: extracted?.text ?? clip(fallbackBody).text,
-      bodyIsExcerptOnly: !extracted,
-    });
-    if (summary) entry.summary = summary;
-    else console.warn(`要約を生成できませんでした(抜粋を掲載します): ${item.link}`);
-  } catch (error) {
-    if (isFatalApiError(error)) throw error;
-    console.warn(`要約中にエラーが発生しました(抜粋を掲載します): ${item.link}`, error);
-  }
+  // Claude Code 自体の失敗(認証エラー・利用上限など)は全記事で起きうるので、
+  // 抜粋だけの不完全なダイジェストを配信しないよう、ここでは捕まえずに処理全体を止める
+  const summary = await summarizeArticle({
+    title: item.title,
+    url: item.link,
+    domain: item.domain,
+    tags: item.tags,
+    note: item.note,
+    body: extracted?.text ?? clip(fallbackBody).text,
+    bodyIsExcerptOnly: !extracted,
+  });
+  if (summary) entry.summary = summary;
+  else console.warn(`要約を生成できませんでした(抜粋を掲載します): ${item.link}`);
   return entry;
 }
 
@@ -97,18 +78,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  const summarizer = new Summarizer(new Anthropic(), config.model);
-  const entries = await mapWithConcurrency(raindrops, CONCURRENCY, (item) => buildEntry(summarizer, item));
-
-  let intro: string | null = null;
-  try {
-    intro = await summarizer.writeIntro(
-      entries.map((e) => ({ title: e.title, headline: e.summary?.headline ?? e.title })),
-    );
-  } catch (error) {
-    if (isFatalApiError(error)) throw error;
-    console.warn("導入文の生成に失敗しました(導入文なしで投稿します)", error);
-  }
+  const entries = await mapWithConcurrency(raindrops, CONCURRENCY, buildEntry);
+  const intro = await writeIntro(entries.map((e) => ({ title: e.title, headline: e.summary?.headline ?? e.title })));
 
   const digest = { date, intro, entries };
   const messages = splitIntoMessages(buildDigestBlocks(digest));

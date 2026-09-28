@@ -25,7 +25,7 @@ concurrency:
 jobs:
   digest:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -36,7 +36,8 @@ jobs:
       - run: npm start
         env:
           RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Claude のサブスクリプション(Pro/Max)で Claude Code を動かすためのトークン
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           RAINDROP_COLLECTION_ID: ${{ vars.RAINDROP_COLLECTION_ID }}
           RAINDROP_TAG: ${{ vars.RAINDROP_TAG }}
