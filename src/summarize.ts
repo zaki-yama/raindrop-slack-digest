@@ -7,9 +7,13 @@ const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 
 export const ArticleSummarySchema = z.object({
   headline: z.string().describe("記事の要点をつかんだ日本語の見出し(40文字程度まで)"),
-  summary: z.string().describe("記事の内容を紹介する日本語の要約(3〜4文)"),
-  key_points: z.array(z.string()).describe("押さえておきたいポイント(3つ程度、各1文)"),
-  recommended_for: z.string().describe("どんな読者におすすめか(1文)"),
+  summary: z
+    .string()
+    .describe(
+      "記事の内容を紹介する日本語の要約(400〜600字程度)。記事が扱う背景・課題、主張や手法、具体的な結果・数値・結論まで踏み込んで書く。段落を分けてよい",
+    ),
+  key_points: z.array(z.string()).describe("押さえておきたいポイント(3〜5つ、各1〜2文の日本語)"),
+  recommended_for: z.string().describe("どんな読者におすすめか(日本語で1文)"),
 });
 export type ArticleSummary = z.infer<typeof ArticleSummarySchema>;
 
@@ -18,7 +22,8 @@ const IntroSchema = z.object({
 });
 
 const ARTICLE_SYSTEM = `あなたはソフトウェアエンジニア向け技術ニュースレターの編集者です。
-読者が「読みに行くべきか」を判断できるよう、記事の内容を正確かつ簡潔に日本語で紹介してください。
+読者が記事を読まなくても要点がつかめ、さらに「原文を読みに行くべきか」も判断できるよう、記事の内容を具体的に日本語で紹介してください。
+- 記事が英語など日本語以外で書かれていても、出力はすべて日本語で書く
 - 記事に書かれていないことを補って断定しない
 - 固有名詞・ライブラリ名・バージョン番号は原文どおりに書く
 - 宣伝文句ではなく、具体的に何が分かる記事なのかを書く

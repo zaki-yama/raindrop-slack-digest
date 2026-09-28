@@ -23,6 +23,22 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
+/**
+ * 認証エラーやクレジット不足など、リクエストを変えても解消しない API エラーか。
+ * これらは全記事で同じように失敗するので、抜粋だけの不完全なダイジェストを配信せずに処理を止める。
+ * (429 や 5xx は SDK が自動でリトライし、それでも失敗した記事だけ抜粋にフォールバックする)
+ */
+function isFatalApiError(error: unknown): boolean {
+  return (
+    error instanceof Anthropic.APIError &&
+    error.status !== undefined &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408 &&
+    error.status !== 429
+  );
+}
+
 async function buildEntry(summarizer: Summarizer, item: Raindrop): Promise<DigestEntry> {
   const entry: DigestEntry = {
     title: item.title,
@@ -55,9 +71,7 @@ async function buildEntry(summarizer: Summarizer, item: Raindrop): Promise<Diges
     if (summary) entry.summary = summary;
     else console.warn(`要約を生成できませんでした(抜粋を掲載します): ${item.link}`);
   } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-      throw error;
-    }
+    if (isFatalApiError(error)) throw error;
     console.warn(`要約中にエラーが発生しました(抜粋を掲載します): ${item.link}`, error);
   }
   return entry;
@@ -92,6 +106,7 @@ async function main(): Promise<void> {
       entries.map((e) => ({ title: e.title, headline: e.summary?.headline ?? e.title })),
     );
   } catch (error) {
+    if (isFatalApiError(error)) throw error;
     console.warn("導入文の生成に失敗しました(導入文なしで投稿します)", error);
   }
 
