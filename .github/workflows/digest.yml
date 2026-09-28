@@ -1,0 +1,60 @@
+name: Raindrop Slack Digest
+
+on:
+  schedule:
+    # 毎日 9:00 JST(0:00 UTC)に前日分を配信
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "対象日(YYYY-MM-DD、日本時間)。空なら前日"
+        type: string
+        required: false
+      dry_run:
+        description: "Slack への投稿と Markdown のコミットをせず、結果をログに出す"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm start
+        env:
+          RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RAINDROP_COLLECTION_ID: ${{ vars.RAINDROP_COLLECTION_ID }}
+          RAINDROP_TAG: ${{ vars.RAINDROP_TAG }}
+          MAX_ARTICLES: ${{ vars.MAX_ARTICLES }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          DIGEST_DATE: ${{ inputs.date }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+      # Slack への投稿に失敗しても、書き出せた Markdown はコミットする
+      - name: Commit digest markdown
+        if: ${{ !cancelled() && !inputs.dry_run }}
+        run: |
+          git add digests
+          if git diff --cached --quiet; then
+            echo "コミットする Markdown はありません"
+            exit 0
+          fi
+          files=$(git diff --cached --name-only | xargs -n1 basename | sed 's/\.md$//' | paste -sd ' ' -)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Add tech digest: ${files}"
+          git push
