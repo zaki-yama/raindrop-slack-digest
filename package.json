@@ -1,0 +1,38 @@
+{
+  "name": "raindrop-slack-digest",
+  "version": "1.0.0",
+  "description": "Raindrop.io にストックした技術記事を要約して Slack にニュースレター形式で投稿する Bot",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dry-run": "DRY_RUN=1 tsx src/index.ts",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zaki-yama/raindrop-slack-digest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zaki-yama/raindrop-slack-digest/issues"
+  },
+  "homepage": "https://github.com/zaki-yama/raindrop-slack-digest#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
+    "@mozilla/readability": "^0.6.0",
+    "linkedom": "^0.18.13",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,35 @@
+name: Raindrop Slack Digest
+
+on:
+  schedule:
+    # 毎週月曜 8:52 JST(日曜 23:52 UTC)
+    - cron: "52 23 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Slack に投稿せず結果をログに出す"
+        type: boolean
+        default: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm start
+        env:
+          RAINDROP_TOKEN: ${{ secrets.RAINDROP_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RAINDROP_COLLECTION_ID: ${{ vars.RAINDROP_COLLECTION_ID }}
+          RAINDROP_TAG: ${{ vars.RAINDROP_TAG }}
+          DIGEST_DAYS: ${{ vars.DIGEST_DAYS }}
+          MAX_ARTICLES: ${{ vars.MAX_ARTICLES }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
