@@ -80,7 +80,7 @@ async function main(): Promise<void> {
 
   const usage = new ClaudeUsage();
   const entries = await mapWithConcurrency(raindrops, CONCURRENCY, (item) => buildEntry(item, usage));
-  const intro = await writeIntro(entries.map((e) => ({ title: e.title, summary: e.summary?.summary })), usage);
+  const intro = await writeIntro(entries.map((e) => ({ title: e.title, summary: e.summary?.tldr })), usage);
 
   const filePath = digestFilePath(OUTPUT_DIR, date);
   const digest: Digest = {

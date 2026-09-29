@@ -9,7 +9,7 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 1. Raindrop API から前日(日本時間の 0:00〜24:00)に追加したブックマークを取得(コレクション・タグで絞り込み可)
 2. 各記事の URL から本文を取得し、[Readability](https://github.com/mozilla/readability) で本文テキストを抽出
    - 取得できなかった場合は Raindrop の抜粋(excerpt)・メモを使用
-3. Claude Code(`claude -p`)で記事ごとに「概要(2〜3文)・ポイント(3〜5個の箇条書き)」を日本語で生成(JSON Schema による構造化出力)
+3. Claude Code(`claude -p`)で記事ごとに、Slack 用の短い版(一言要約＋見出し語付きの3点)と Markdown 用の詳しい版(概要＋3〜5点のポイント)を日本語で生成(JSON Schema による構造化出力)
 4. 今号全体の導入文を生成
 5. `digests/YYYY/YYYY-MM-DD.md` に Markdown 版を書き出す
 6. Slack Incoming Webhook に Block Kit で投稿(50 ブロックを超える場合は記事の区切りで分割)
@@ -25,10 +25,10 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 今日はランタイムと型システムの話題が中心です。…
 ────────────
 1. Bun v1.3 Release Notes            ← 記事の原題(リンク)
-   記事の概要(2〜3文)
-
-   • ポイント1
-   • ポイント2
+   一言要約(1文)
+   • *見出し語*: ポイント1
+   • *見出し語*: ポイント2
+   • *見出し語*: ポイント3
 🔗 bun.sh | 🏷️ #javascript
 ────────────
 …

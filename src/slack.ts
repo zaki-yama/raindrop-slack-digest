@@ -64,10 +64,9 @@ export function buildEntryBlocks(entry: DigestEntry, index: number): Block[] {
   const { summary } = entry;
   const lines = [`*${index + 1}. ${link(entry.url, entry.title)}*`];
   if (summary) {
-    lines.push(escapeMrkdwn(summary.summary));
-    if (summary.key_points.length > 0) {
-      lines.push("", ...summary.key_points.map((p) => `• ${escapeMrkdwn(p)}`));
-    }
+    // Slack には短い版(一言要約 + 見出し語付きの3点)だけを載せ、詳しい版は GitHub の Markdown に残す
+    lines.push(escapeMrkdwn(summary.tldr));
+    lines.push(...summary.highlights.map((h) => `• *${escapeMrkdwn(h.label)}*: ${escapeMrkdwn(h.text)}`));
   } else if (entry.excerpt) {
     lines.push(escapeMrkdwn(entry.excerpt));
   }

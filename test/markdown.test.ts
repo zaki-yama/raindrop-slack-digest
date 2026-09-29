@@ -8,7 +8,12 @@ describe("buildDigestMarkdown", () => {
     entries: [
       {
         title: "Original [Title]", url: "https://example.com/a_(b)", domain: "example.com", tags: ["ts"], excerpt: "",
-        summary: { summary: "要約です。", key_points: ["ポイント1", "ポイント2"] },
+        summary: {
+          tldr: "一言要約",
+          highlights: [{ label: "a", text: "b" }, { label: "c", text: "d" }, { label: "e", text: "f" }],
+          summary: "要約です。",
+          key_points: ["ポイント1", "ポイント2"],
+        },
       },
       { title: "No Summary", url: "https://example.com/b", domain: "example.com", tags: [], excerpt: "抜粋です" },
     ],
