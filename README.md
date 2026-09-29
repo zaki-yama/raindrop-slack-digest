@@ -32,7 +32,7 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 🔗 bun.sh | 🏷️ #javascript
 ────────────
 …
-🤖 Claude Code 使用量: claude-sonnet-5・4 回呼び出し・API 換算で約 $0.35(…)
+📝 GitHub で読む  |  🤖 Claude Code 使用量: claude-sonnet-5・4 回呼び出し・API 換算で約 $0.35
 ```
 
 ## セットアップ

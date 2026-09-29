@@ -43,13 +43,19 @@ describe("buildEntryBlocks", () => {
 });
 
 describe("buildDigestBlocks", () => {
-  it("使用量があれば最後にフッターを付ける", () => {
+  it("Markdown へのリンクと使用量を最後のフッターに載せる", () => {
     const blocks = buildDigestBlocks({
       date: "2026-09-27", intro: null, entries: [entry(1)],
       usage: { calls: 3, costUsd: 0.1234, models: ["claude-sonnet-5"] },
+      archiveUrl: "https://github.com/o/r/blob/main/digests/2026/2026-09-27.md",
     });
-    const last = JSON.stringify(blocks.at(-1));
-    expect(last).toContain("claude-sonnet-5・3 回呼び出し・API 換算で約 $0.12");
+    expect(blocks.at(-1)).toEqual({
+      type: "context",
+      elements: [{
+        type: "mrkdwn",
+        text: "📝 <https://github.com/o/r/blob/main/digests/2026/2026-09-27.md|GitHub で読む>  |  🤖 Claude Code 使用量: claude-sonnet-5・3 回呼び出し・API 換算で約 $0.12",
+      }],
+    });
   });
 });
 

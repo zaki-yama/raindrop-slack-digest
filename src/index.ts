@@ -1,7 +1,7 @@
 import { loadConfig } from "./config.js";
 import { dayRangeJst, previousDateJst } from "./dates.js";
 import { clip, extractArticle } from "./extract.js";
-import { buildDigestMarkdown, writeDigestMarkdown } from "./markdown.js";
+import { buildDigestMarkdown, digestFilePath, githubFileUrl, writeDigestMarkdown } from "./markdown.js";
 import { fetchRecentRaindrops, type Raindrop } from "./raindrop.js";
 import { buildDigestBlocks, buildFallbackText, postToSlack, splitIntoMessages, type Digest, type DigestEntry } from "./slack.js";
 import { ClaudeUsage, summarizeArticle, writeIntro } from "./summarize.js";
@@ -82,11 +82,13 @@ async function main(): Promise<void> {
   const entries = await mapWithConcurrency(raindrops, CONCURRENCY, (item) => buildEntry(item, usage));
   const intro = await writeIntro(entries.map((e) => ({ title: e.title, summary: e.summary?.summary })), usage);
 
+  const filePath = digestFilePath(OUTPUT_DIR, date);
   const digest: Digest = {
     date,
     intro,
     entries,
     usage: { calls: usage.calls, costUsd: usage.costUsd, models: [...usage.models] },
+    archiveUrl: githubFileUrl(filePath),
   };
   const messages = splitIntoMessages(buildDigestBlocks(digest));
 
@@ -97,7 +99,7 @@ async function main(): Promise<void> {
   }
 
   // Slack への投稿が失敗してもアーカイブは残るよう、先にファイルへ書き出す
-  const filePath = await writeDigestMarkdown(OUTPUT_DIR, digest);
+  await writeDigestMarkdown(filePath, digest);
   console.log(`Markdown を書き出しました: ${filePath}`);
 
   await postToSlack(config.slackWebhookUrl, buildFallbackText(digest), messages);

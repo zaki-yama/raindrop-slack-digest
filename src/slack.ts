@@ -31,12 +31,14 @@ export interface Digest {
   intro: string | null;
   entries: DigestEntry[];
   usage?: DigestUsage;
+  /** GitHub 上の Markdown 版の URL */
+  archiveUrl?: string;
 }
 
 /** フッターに載せる Claude Code の使用量の説明 */
 export function formatUsage(usage: DigestUsage): string {
   const models = usage.models.length > 0 ? `${usage.models.join(", ")}・` : "";
-  return `Claude Code 使用量: ${models}${usage.calls} 回呼び出し・API 換算で約 $${usage.costUsd.toFixed(2)}(サブスクリプションの枠内のため実際の請求はありません)`;
+  return `Claude Code 使用量: ${models}${usage.calls} 回呼び出し・API 換算で約 $${usage.costUsd.toFixed(2)}`;
 }
 
 /** Slack mrkdwn の制御文字をエスケープする */
@@ -98,8 +100,11 @@ export function buildDigestBlocks(digest: Digest): Block[] {
   }
   blocks.push({ type: "divider" });
   digest.entries.forEach((entry, i) => blocks.push(...buildEntryBlocks(entry, i)));
-  if (digest.usage) {
-    blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `🤖 ${escapeMrkdwn(formatUsage(digest.usage))}` }] });
+  const footer: string[] = [];
+  if (digest.archiveUrl) footer.push(`📝 ${link(digest.archiveUrl, "GitHub で読む")}`);
+  if (digest.usage) footer.push(`🤖 ${escapeMrkdwn(formatUsage(digest.usage))}`);
+  if (footer.length > 0) {
+    blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: footer.join("  |  ") }] });
   }
   return blocks;
 }
