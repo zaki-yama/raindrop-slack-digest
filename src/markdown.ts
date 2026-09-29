@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { formatDate, type Digest, type DigestEntry } from "./slack.js";
+import { formatDate, formatUsage, type Digest, type DigestEntry } from "./slack.js";
 
 /** リンクテキスト内で Markdown の構文として解釈される角括弧をエスケープする */
 function escapeLinkText(text: string): string {
@@ -14,18 +14,15 @@ function singleLine(text: string): string {
 
 function renderEntry(entry: DigestEntry, index: number): string {
   const { summary } = entry;
-  const heading = singleLine(summary?.headline ?? entry.title);
-  const lines = [`## ${index + 1}. [${escapeLinkText(heading)}](<${entry.url}>)`, ""];
+  const lines = [`## ${index + 1}. [${escapeLinkText(singleLine(entry.title))}](<${entry.url}>)`, "", entry.domain, ""];
 
   if (summary) {
-    lines.push(`*${singleLine(entry.title)}* — ${entry.domain}`, "", summary.summary, "");
+    lines.push(summary.summary, "");
     if (summary.key_points.length > 0) {
       lines.push(...summary.key_points.map((p) => `- ${singleLine(p)}`), "");
     }
-    if (summary.recommended_for) lines.push(`**🎯 こんな人におすすめ:** ${singleLine(summary.recommended_for)}  `);
-  } else {
-    lines.push(entry.domain, "");
-    if (entry.excerpt) lines.push(entry.excerpt, "");
+  } else if (entry.excerpt) {
+    lines.push(entry.excerpt, "");
   }
   if (entry.tags.length > 0) lines.push(`**🏷️ タグ:** ${entry.tags.map((t) => `\`#${t}\``).join(" ")}`);
 
@@ -39,6 +36,7 @@ export function buildDigestMarkdown(digest: Digest): string {
   ];
   if (digest.intro) parts.push(digest.intro.split("\n").map((line) => `> ${line}`).join("\n"));
   parts.push(...digest.entries.map(renderEntry));
+  if (digest.usage) parts.push("---", `*🤖 ${formatUsage(digest.usage)}*`);
   return `${parts.join("\n\n")}\n`;
 }
 

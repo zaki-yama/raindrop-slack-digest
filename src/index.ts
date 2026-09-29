@@ -3,8 +3,8 @@ import { dayRangeJst, previousDateJst } from "./dates.js";
 import { clip, extractArticle } from "./extract.js";
 import { buildDigestMarkdown, writeDigestMarkdown } from "./markdown.js";
 import { fetchRecentRaindrops, type Raindrop } from "./raindrop.js";
-import { buildDigestBlocks, buildFallbackText, postToSlack, splitIntoMessages, type DigestEntry } from "./slack.js";
-import { summarizeArticle, writeIntro } from "./summarize.js";
+import { buildDigestBlocks, buildFallbackText, postToSlack, splitIntoMessages, type Digest, type DigestEntry } from "./slack.js";
+import { ClaudeUsage, summarizeArticle, writeIntro } from "./summarize.js";
 
 /** 同時に動かす Claude Code の数。サブスクリプションの利用上限に配慮して控えめにする */
 const CONCURRENCY = 2;
@@ -23,7 +23,7 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
   return results;
 }
 
-async function buildEntry(item: Raindrop): Promise<DigestEntry> {
+async function buildEntry(item: Raindrop, usage: ClaudeUsage): Promise<DigestEntry> {
   const entry: DigestEntry = {
     title: item.title,
     url: item.link,
@@ -52,7 +52,7 @@ async function buildEntry(item: Raindrop): Promise<DigestEntry> {
     note: item.note,
     body: extracted?.text ?? clip(fallbackBody).text,
     bodyIsExcerptOnly: !extracted,
-  });
+  }, usage);
   if (summary) entry.summary = summary;
   else console.warn(`要約を生成できませんでした(抜粋を掲載します): ${item.link}`);
   return entry;
@@ -78,10 +78,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  const entries = await mapWithConcurrency(raindrops, CONCURRENCY, buildEntry);
-  const intro = await writeIntro(entries.map((e) => ({ title: e.title, headline: e.summary?.headline ?? e.title })));
+  const usage = new ClaudeUsage();
+  const entries = await mapWithConcurrency(raindrops, CONCURRENCY, (item) => buildEntry(item, usage));
+  const intro = await writeIntro(entries.map((e) => ({ title: e.title, summary: e.summary?.summary })), usage);
 
-  const digest = { date, intro, entries };
+  const digest: Digest = {
+    date,
+    intro,
+    entries,
+    usage: { calls: usage.calls, costUsd: usage.costUsd, models: [...usage.models] },
+  };
   const messages = splitIntoMessages(buildDigestBlocks(digest));
 
   if (config.dryRun) {

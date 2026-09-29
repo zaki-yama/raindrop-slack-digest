@@ -9,7 +9,7 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 1. Raindrop API から前日(日本時間の 0:00〜24:00)に追加したブックマークを取得(コレクション・タグで絞り込み可)
 2. 各記事の URL から本文を取得し、[Readability](https://github.com/mozilla/readability) で本文テキストを抽出
    - 取得できなかった場合は Raindrop の抜粋(excerpt)・メモを使用
-3. Claude Code(`claude -p`)で記事ごとに「見出し・要約・ポイント・おすすめ読者」を日本語で生成(JSON Schema による構造化出力)
+3. Claude Code(`claude -p`)で記事ごとに「概要(2〜3文)・ポイント(3〜5個の箇条書き)」を日本語で生成(JSON Schema による構造化出力)
 4. 今号全体の導入文を生成
 5. `digests/YYYY/YYYY-MM-DD.md` に Markdown 版を書き出す
 6. Slack Incoming Webhook に Block Kit で投稿(50 ブロックを超える場合は記事の区切りで分割)
@@ -24,14 +24,15 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 2026/09/27 に Raindrop へストックした記事 3 本を紹介します
 今日はランタイムと型システムの話題が中心です。…
 ────────────
-1. Bun 1.3 で何が変わったか            ← 記事へのリンク
-   _Original Article Title_
-   記事の要約(3〜4文)
+1. Bun v1.3 Release Notes            ← 記事の原題(リンク)
+   記事の概要(2〜3文)
+
    • ポイント1
    • ポイント2
-🔗 example.com | 🎯 Node.js からの移行を検討している人 | 🏷️ #javascript
+🔗 bun.sh | 🏷️ #javascript
 ────────────
 …
+🤖 Claude Code 使用量: claude-sonnet-5・4 回呼び出し・API 換算で約 $0.35(…)
 ```
 
 ## セットアップ
@@ -94,3 +95,4 @@ npm test
 - `ANTHROPIC_API_KEY` が設定されていると Claude Code はそちらを優先して従量課金になるので、Secrets には登録しないでください
 - 記事本文には外部の文章が含まれるため、Claude Code はツールをすべて無効にした状態で実行しています
 - 本文が非常に長い記事は先頭 60,000 文字だけを要約に使います
+- 投稿の最後の使用量は Claude Code が報告する API 定価での換算額です。サブスクリプションで動かしている場合、実際には請求されません

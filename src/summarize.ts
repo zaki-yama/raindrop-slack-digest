@@ -5,23 +5,23 @@ import { z } from "zod";
 const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const ArticleSummarySchema = z.object({
-  headline: z.string().describe("記事の要点をつかんだ日本語の見出し(40文字程度まで)"),
   summary: z
     .string()
+    .describe("記事が何について書かれているかの概要(日本語で2〜3文、150字程度)。改行や箇条書きは含めない"),
+  key_points: z
+    .array(z.string())
     .describe(
-      "記事の内容を紹介する日本語の要約(400〜600字程度)。記事が扱う背景・課題、主張や手法、具体的な結果・数値・結論まで踏み込んで書く。段落を分けてよい",
+      "記事の中身として押さえておきたいポイント(3〜5つ)。主張・手法・結果・数値など具体的な内容を、それぞれ日本語で1文(60字程度まで)で書く",
     ),
-  key_points: z.array(z.string()).describe("押さえておきたいポイント(3〜5つ、各1〜2文の日本語)"),
-  recommended_for: z.string().describe("どんな読者におすすめか(日本語で1文)"),
 });
 export type ArticleSummary = z.infer<typeof ArticleSummarySchema>;
 
 const IntroSchema = z.object({
-  intro: z.string().describe("今号のダイジェスト冒頭に載せる編集後記風の導入文(2〜4文)"),
+  intro: z.string().describe("今号のダイジェスト冒頭に載せる導入文(日本語で2〜3文)"),
 });
 
 const ARTICLE_SYSTEM = `あなたはソフトウェアエンジニア向け技術ニュースレターの編集者です。
-読者が記事を読まなくても要点がつかめ、さらに「原文を読みに行くべきか」も判断できるよう、記事の内容を具体的に日本語で紹介してください。
+読者が Slack 上で短時間に要点をつかみ、「原文を読みに行くべきか」を判断できるよう、記事の内容を簡潔かつ具体的に日本語で紹介してください。
 - 記事が英語など日本語以外で書かれていても、出力はすべて日本語で書く
 - 記事に書かれていないことを補って断定しない
 - 固有名詞・ライブラリ名・バージョン番号は原文どおりに書く
@@ -48,9 +48,27 @@ export class ClaudeCliError extends Error {}
 /** `claude -p --output-format json` が返す結果のうち、使う項目だけ */
 const CliResultSchema = z.object({
   is_error: z.boolean(),
+  total_cost_usd: z.number().optional(),
+  modelUsage: z.record(z.string(), z.unknown()).optional(),
   result: z.string().optional(),
   structured_output: z.unknown().optional(),
 });
+
+/**
+ * Claude Code の使用量の集計。
+ * CLI が報告する total_cost_usd は API の定価で換算した金額で、サブスクリプションで動かしている場合は実際には請求されない。
+ */
+export class ClaudeUsage {
+  calls = 0;
+  costUsd = 0;
+  readonly models = new Set<string>();
+
+  add(result: { total_cost_usd?: number; modelUsage?: Record<string, unknown> }): void {
+    this.calls += 1;
+    this.costUsd += result.total_cost_usd ?? 0;
+    for (const model of Object.keys(result.modelUsage ?? {})) this.models.add(model);
+  }
+}
 
 /**
  * Claude Code CLI(`claude -p`)にプロンプトを渡し、JSON Schema に沿った構造化出力を受け取る。
@@ -64,6 +82,7 @@ export async function runClaude<T extends z.ZodType>(
   schema: T,
   systemPrompt: string,
   prompt: string,
+  usage: ClaudeUsage,
 ): Promise<z.infer<T> | null> {
   // CLI の検証器は draft 2020-12 の $schema 宣言を解釈できないので外す
   const { $schema: _, ...jsonSchema } = z.toJSONSchema(schema);
@@ -89,6 +108,7 @@ export async function runClaude<T extends z.ZodType>(
   } catch {
     throw new ClaudeCliError(`Claude Code の出力を解釈できませんでした: ${stdout.slice(0, 1000)}`);
   }
+  usage.add(parsed);
   if (parsed.is_error) {
     throw new ClaudeCliError(`Claude Code がエラーを返しました: ${parsed.result ?? "(詳細なし)"}`);
   }
@@ -115,7 +135,7 @@ function exec(command: string, args: string[], input: string): Promise<string> {
 }
 
 /** 記事1本を要約する。出力がスキーマに合わなかった場合は null */
-export function summarizeArticle(article: ArticleInput): Promise<ArticleSummary | null> {
+export function summarizeArticle(article: ArticleInput, usage: ClaudeUsage): Promise<ArticleSummary | null> {
   const meta = [
     `タイトル: ${article.title}`,
     `URL: ${article.url}`,
@@ -126,12 +146,15 @@ export function summarizeArticle(article: ArticleInput): Promise<ArticleSummary 
     .filter(Boolean)
     .join("\n");
 
-  return runClaude(ArticleSummarySchema, ARTICLE_SYSTEM, `${meta}\n\n<article>\n${article.body}\n</article>`);
+  return runClaude(ArticleSummarySchema, ARTICLE_SYSTEM, `${meta}\n\n<article>\n${article.body}\n</article>`, usage);
 }
 
 /** 今号全体の導入文を書く */
-export async function writeIntro(items: { title: string; headline: string }[]): Promise<string | null> {
-  const list = items.map((item, i) => `${i + 1}. ${item.headline}(原題: ${item.title})`).join("\n");
-  const output = await runClaude(IntroSchema, INTRO_SYSTEM, `<articles>\n${list}\n</articles>`);
+export async function writeIntro(
+  items: { title: string; summary?: string }[],
+  usage: ClaudeUsage,
+): Promise<string | null> {
+  const list = items.map((item, i) => `${i + 1}. ${item.title}${item.summary ? `\n   ${item.summary}` : ""}`).join("\n");
+  const output = await runClaude(IntroSchema, INTRO_SYSTEM, `<articles>\n${list}\n</articles>`, usage);
   return output?.intro ?? null;
 }
