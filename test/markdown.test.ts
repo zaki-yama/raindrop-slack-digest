@@ -8,10 +8,11 @@ describe("buildDigestMarkdown", () => {
     entries: [
       {
         title: "Original [Title]", url: "https://example.com/a_(b)", domain: "example.com", tags: ["ts"], excerpt: "",
-        summary: { headline: "見出し [1]", summary: "要約です。", key_points: ["ポイント1", "ポイント2"], recommended_for: "TS 使い" },
+        summary: { summary: "要約です。", key_points: ["ポイント1", "ポイント2"] },
       },
       { title: "No Summary", url: "https://example.com/b", domain: "example.com", tags: [], excerpt: "抜粋です" },
     ],
+    usage: { calls: 3, costUsd: 0.5, models: ["claude-sonnet-5"] },
   });
 
   it("タイトルと導入文を出力する", () => {
@@ -20,17 +21,19 @@ describe("buildDigestMarkdown", () => {
     expect(markdown).toContain("> 今日は TypeScript の話題です。\n> 2行目");
   });
 
-  it("要約付きの記事を見出し・要約・箇条書きで出力する", () => {
-    expect(markdown).toContain("## 1. [見出し \\[1\\]](<https://example.com/a_(b)>)");
-    expect(markdown).toContain("*Original [Title]* — example.com");
-    expect(markdown).toContain("- ポイント1\n- ポイント2");
-    expect(markdown).toContain("**🎯 こんな人におすすめ:** TS 使い");
-    expect(markdown).toContain("**🏷️ タグ:** `#ts`");
+  it("要約付きの記事を原題・概要・箇条書きで出力する", () => {
+    expect(markdown).toContain(
+      "## 1. [Original \\[Title\\]](<https://example.com/a_(b)>)\n\nexample.com\n\n要約です。\n\n- ポイント1\n- ポイント2\n\n**🏷️ タグ:** `#ts`",
+    );
+    expect(markdown).not.toContain("🎯");
   });
 
-  it("要約がない記事は元タイトルと抜粋を出力する", () => {
+  it("要約がない記事は抜粋を出力する", () => {
     expect(markdown).toContain("## 2. [No Summary](<https://example.com/b>)\n\nexample.com\n\n抜粋です");
-    expect(markdown.endsWith("抜粋です\n")).toBe(true);
+  });
+
+  it("最後に使用量を出力する", () => {
+    expect(markdown.endsWith("---\n\n*🤖 Claude Code 使用量: claude-sonnet-5・3 回呼び出し・API 換算で約 $0.50(サブスクリプションの枠内のため実際の請求はありません)*\n")).toBe(true);
   });
 });
 

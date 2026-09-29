@@ -17,11 +17,26 @@ export interface DigestEntry {
   excerpt: string;
 }
 
+export interface DigestUsage {
+  /** Claude Code の呼び出し回数 */
+  calls: number;
+  /** API の定価で換算したコスト(USD)。サブスクリプション利用時は実際には請求されない */
+  costUsd: number;
+  models: string[];
+}
+
 export interface Digest {
   /** 対象日(日本時間, YYYY-MM-DD) */
   date: string;
   intro: string | null;
   entries: DigestEntry[];
+  usage?: DigestUsage;
+}
+
+/** フッターに載せる Claude Code の使用量の説明 */
+export function formatUsage(usage: DigestUsage): string {
+  const models = usage.models.length > 0 ? `${usage.models.join(", ")}・` : "";
+  return `Claude Code 使用量: ${models}${usage.calls} 回呼び出し・API 換算で約 $${usage.costUsd.toFixed(2)}(サブスクリプションの枠内のため実際の請求はありません)`;
 }
 
 /** Slack mrkdwn の制御文字をエスケープする */
@@ -45,20 +60,17 @@ export function formatDate(date: string): string {
 
 export function buildEntryBlocks(entry: DigestEntry, index: number): Block[] {
   const { summary } = entry;
-  const heading = `*${index + 1}. ${link(entry.url, summary?.headline ?? entry.title)}*`;
-
-  const lines = [heading];
+  const lines = [`*${index + 1}. ${link(entry.url, entry.title)}*`];
   if (summary) {
-    lines.push(`_${escapeMrkdwn(entry.title)}_`, "", escapeMrkdwn(summary.summary));
+    lines.push(escapeMrkdwn(summary.summary));
     if (summary.key_points.length > 0) {
       lines.push("", ...summary.key_points.map((p) => `• ${escapeMrkdwn(p)}`));
     }
   } else if (entry.excerpt) {
-    lines.push("", escapeMrkdwn(entry.excerpt));
+    lines.push(escapeMrkdwn(entry.excerpt));
   }
 
   const context: string[] = [`🔗 ${escapeMrkdwn(entry.domain)}`];
-  if (summary?.recommended_for) context.push(`🎯 ${escapeMrkdwn(summary.recommended_for)}`);
   if (entry.tags.length > 0) context.push(`🏷️ ${entry.tags.map((t) => `#${escapeMrkdwn(t)}`).join(" ")}`);
 
   return [
@@ -86,6 +98,9 @@ export function buildDigestBlocks(digest: Digest): Block[] {
   }
   blocks.push({ type: "divider" });
   digest.entries.forEach((entry, i) => blocks.push(...buildEntryBlocks(entry, i)));
+  if (digest.usage) {
+    blocks.push({ type: "context", elements: [{ type: "mrkdwn", text: `🤖 ${escapeMrkdwn(formatUsage(digest.usage))}` }] });
+  }
   return blocks;
 }
 
