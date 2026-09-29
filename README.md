@@ -9,7 +9,7 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 1. Raindrop API から前日(日本時間の 0:00〜24:00)に追加したブックマークを取得(コレクション・タグで絞り込み可)
 2. 各記事の URL から本文を取得し、[Readability](https://github.com/mozilla/readability) で本文テキストを抽出
    - 取得できなかった場合は Raindrop の抜粋(excerpt)・メモを使用
-3. Claude API で記事ごとに「見出し・要約・ポイント・おすすめ読者」を日本語で生成(Structured Outputs)
+3. Claude Code(`claude -p`)で記事ごとに「見出し・要約・ポイント・おすすめ読者」を日本語で生成(JSON Schema による構造化出力)
 4. 今号全体の導入文を生成
 5. `digests/YYYY/YYYY-MM-DD.md` に Markdown 版を書き出す
 6. Slack Incoming Webhook に Block Kit で投稿(50 ブロックを超える場合は記事の区切りで分割)
@@ -41,12 +41,12 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 | 名前 | 取得方法 |
 | --- | --- |
 | `RAINDROP_TOKEN` | Raindrop の [Integrations 設定](https://app.raindrop.io/settings/integrations) でアプリを作成し、「Test token」を発行 |
-| `ANTHROPIC_API_KEY` | [Claude Console](https://console.anthropic.com/) で API キーを発行 |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Code をインストールしたマシンで `claude setup-token` を実行して発行(Claude の Pro / Max プランが必要) |
 | `SLACK_WEBHOOK_URL` | Slack App を作成して [Incoming Webhooks](https://api.slack.com/messaging/webhooks) を有効化し、投稿先チャンネルの Webhook URL を発行 |
 
 ### 2. GitHub リポジトリに登録する
 
-- **Settings → Secrets and variables → Actions → Secrets** に `RAINDROP_TOKEN` / `ANTHROPIC_API_KEY` / `SLACK_WEBHOOK_URL` を登録
+- **Settings → Secrets and variables → Actions → Secrets** に `RAINDROP_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN` / `SLACK_WEBHOOK_URL` を登録
 - 必要に応じて **Variables** に以下を登録(未設定ならデフォルト値)
 
 | 変数 | デフォルト | 説明 |
@@ -54,7 +54,7 @@ GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバ�
 | `RAINDROP_COLLECTION_ID` | `0` | 対象コレクション ID。`0` は全コレクション(ゴミ箱を除く)。コレクションを開いたときの URL 末尾の数字 |
 | `RAINDROP_TAG` | なし | 指定したタグが付いた記事だけを対象にする(例: `tech`) |
 | `MAX_ARTICLES` | `20` | 1 回に紹介する最大件数 |
-| `ANTHROPIC_MODEL` | `claude-opus-5` | 要約に使うモデル。コストを抑えたい場合は `claude-sonnet-5` など |
+| `ANTHROPIC_MODEL` | Claude Code の既定 | 要約に使うモデル(`sonnet` / `opus` などのエイリアスも可)。利用枠を節約したい場合は `sonnet` |
 
 ### 3. 動作確認
 
@@ -89,5 +89,8 @@ npm test
 ## メモ
 
 - 記事の要約に失敗した場合(本文取得失敗・モデルの拒否など)も、その記事は Raindrop の抜粋付きで掲載されます
-- Claude の安全性フィルタで要約が拒否された場合に備えて、サーバー側フォールバック(`fallbacks: "default"`、beta)を有効にしています
+- ただし Claude Code の認証エラーや利用上限など、Claude Code 自体が失敗したときは抜粋だけの不完全なダイジェストを配信せず、ジョブを失敗させます(Slack 投稿・Markdown のコミットもしません)
+- 要約は Claude API ではなく Claude Code の CLI で行うので、API の従量課金はかからず、Claude のサブスクリプションの利用枠を消費します(普段の Claude / Claude Code の利用と枠を共有します)
+- `ANTHROPIC_API_KEY` が設定されていると Claude Code はそちらを優先して従量課金になるので、Secrets には登録しないでください
+- 記事本文には外部の文章が含まれるため、Claude Code はツールをすべて無効にした状態で実行しています
 - 本文が非常に長い記事は先頭 60,000 文字だけを要約に使います
