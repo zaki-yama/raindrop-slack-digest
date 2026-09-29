@@ -45,9 +45,18 @@ export function digestFilePath(outputDir: string, date: string): string {
   return path.join(outputDir, date.slice(0, 4), `${date}.md`);
 }
 
-export async function writeDigestMarkdown(outputDir: string, digest: Digest): Promise<string> {
-  const filePath = digestFilePath(outputDir, digest.date);
+/**
+ * GitHub Actions 上で実行している場合、コミットされる Markdown の GitHub 上の URL を返す。
+ * ワークフローは実行したブランチ(通常はデフォルトブランチ)にコミットする。
+ */
+export function githubFileUrl(filePath: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
+  const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_REF_NAME } = env;
+  if (!GITHUB_SERVER_URL || !GITHUB_REPOSITORY || !GITHUB_REF_NAME) return undefined;
+  const encodedPath = filePath.split(path.sep).map(encodeURIComponent).join("/");
+  return `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${encodeURIComponent(GITHUB_REF_NAME)}/${encodedPath}`;
+}
+
+export async function writeDigestMarkdown(filePath: string, digest: Digest): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   await writeFile(filePath, buildDigestMarkdown(digest), "utf8");
-  return filePath;
 }

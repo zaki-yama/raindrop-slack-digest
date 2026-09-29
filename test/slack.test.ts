@@ -7,7 +7,18 @@ const entry = (n: number, withSummary = true): DigestEntry => ({
   domain: "example.com",
   tags: ["typescript"],
   excerpt: "excerpt",
-  summary: withSummary ? { summary: "要約 & 説明", key_points: ["ポイント1", "ポイント2"] } : undefined,
+  summary: withSummary
+    ? {
+        tldr: "一言 & 要約",
+        highlights: [
+          { label: "価格", text: "20% 安い" },
+          { label: "仕組み", text: "<キャッシュ>" },
+          { label: "使い分け", text: "medium 基本" },
+        ],
+        summary: "詳しい概要",
+        key_points: ["詳しいポイント"],
+      }
+    : undefined,
 });
 
 const textOf = (block: unknown) => (block as { text: { text: string } }).text.text;
@@ -19,12 +30,14 @@ describe("escapeMrkdwn", () => {
 });
 
 describe("buildEntryBlocks", () => {
-  it("原題のリンク・概要・箇条書きを section/context/divider にする", () => {
+  it("原題のリンク・一言要約・見出し語付きの3点を section/context/divider にする", () => {
     const blocks = buildEntryBlocks(entry(1), 0);
     expect(blocks.map((b) => b.type)).toEqual(["section", "context", "divider"]);
     expect(textOf(blocks[0])).toBe(
-      "*1. <https://example.com/1|Original &lt;Title&gt;│1>*\n要約 &amp; 説明\n\n• ポイント1\n• ポイント2",
+      "*1. <https://example.com/1|Original &lt;Title&gt;│1>*\n一言 &amp; 要約\n• *価格*: 20% 安い\n• *仕組み*: &lt;キャッシュ&gt;\n• *使い分け*: medium 基本",
     );
+    // 詳しい版は Slack には載せない
+    expect(textOf(blocks[0])).not.toContain("詳しい");
     const context = JSON.stringify(blocks[1]);
     expect(context).toContain("example.com");
     expect(context).toContain("#typescript");
@@ -37,19 +50,25 @@ describe("buildEntryBlocks", () => {
 
   it("長すぎる本文は 3000 文字に切り詰める", () => {
     const e = entry(3);
-    e.summary!.summary = "あ".repeat(5000);
+    e.summary!.tldr = "あ".repeat(5000);
     expect(textOf(buildEntryBlocks(e, 0)[0]).length).toBe(3000);
   });
 });
 
 describe("buildDigestBlocks", () => {
-  it("使用量があれば最後にフッターを付ける", () => {
+  it("Markdown へのリンクと使用量を最後のフッターに載せる", () => {
     const blocks = buildDigestBlocks({
       date: "2026-09-27", intro: null, entries: [entry(1)],
       usage: { calls: 3, costUsd: 0.1234, models: ["claude-sonnet-5"] },
+      archiveUrl: "https://github.com/o/r/blob/main/digests/2026/2026-09-27.md",
     });
-    const last = JSON.stringify(blocks.at(-1));
-    expect(last).toContain("claude-sonnet-5・3 回呼び出し・API 換算で約 $0.12");
+    expect(blocks.at(-1)).toEqual({
+      type: "context",
+      elements: [{
+        type: "mrkdwn",
+        text: "📝 <https://github.com/o/r/blob/main/digests/2026/2026-09-27.md|GitHub で読む>  |  🤖 Claude Code 使用量: claude-sonnet-5・3 回呼び出し・API 換算で約 $0.12",
+      }],
+    });
   });
 });
 

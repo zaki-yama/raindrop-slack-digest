@@ -5,13 +5,26 @@ import { z } from "zod";
 const CLAUDE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export const ArticleSummarySchema = z.object({
+  // Slack に載せる短い版
+  tldr: z.string().describe("Slack 用: 記事が何についての記事かを一言で(日本語で1文、60字程度まで)"),
+  highlights: z
+    .array(
+      z.object({
+        label: z.string().describe("このポイントを表す短い見出し語(日本語で2〜10字程度。例: 価格、仕組み、使い分け)"),
+        text: z.string().describe("ポイントの中身(日本語で1文、40字程度まで。数値や固有名詞を優先)"),
+      }),
+    )
+    .min(3)
+    .max(3)
+    .describe("Slack 用: 記事の最も重要なポイントをちょうど3つ"),
+  // GitHub の Markdown に残す詳しい版
   summary: z
     .string()
-    .describe("記事が何について書かれているかの概要(日本語で2〜3文、150字程度)。改行や箇条書きは含めない"),
+    .describe("Markdown 用: 記事が何について書かれているかの概要(日本語で2〜3文、150字程度)。改行や箇条書きは含めない"),
   key_points: z
     .array(z.string())
     .describe(
-      "記事の中身として押さえておきたいポイント(3〜5つ)。主張・手法・結果・数値など具体的な内容を、それぞれ日本語で1文(60字程度まで)で書く",
+      "Markdown 用: 記事の中身として押さえておきたいポイント(3〜5つ)。主張・手法・結果・数値など具体的な内容を、それぞれ日本語で1文(60字程度まで)で書く",
     ),
 });
 export type ArticleSummary = z.infer<typeof ArticleSummarySchema>;
@@ -21,7 +34,8 @@ const IntroSchema = z.object({
 });
 
 const ARTICLE_SYSTEM = `あなたはソフトウェアエンジニア向け技術ニュースレターの編集者です。
-読者が Slack 上で短時間に要点をつかみ、「原文を読みに行くべきか」を判断できるよう、記事の内容を簡潔かつ具体的に日本語で紹介してください。
+記事ごとに、Slack でざっと眺めるための短い版(tldr, highlights)と、あとから読み返すための詳しい版(summary, key_points)を日本語で書いてください。
+Slack 用の短い版は、読者が数秒で要点をつかみ「原文を読みに行くべきか」を判断できるよう、とにかく簡潔にしてください。
 - 記事が英語など日本語以外で書かれていても、出力はすべて日本語で書く
 - 記事に書かれていないことを補って断定しない
 - 固有名詞・ライブラリ名・バージョン番号は原文どおりに書く

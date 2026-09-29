@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDigestMarkdown, digestFilePath } from "../src/markdown.js";
+import { buildDigestMarkdown, digestFilePath, githubFileUrl } from "../src/markdown.js";
 
 describe("buildDigestMarkdown", () => {
   const markdown = buildDigestMarkdown({
@@ -8,7 +8,12 @@ describe("buildDigestMarkdown", () => {
     entries: [
       {
         title: "Original [Title]", url: "https://example.com/a_(b)", domain: "example.com", tags: ["ts"], excerpt: "",
-        summary: { summary: "要約です。", key_points: ["ポイント1", "ポイント2"] },
+        summary: {
+          tldr: "一言要約",
+          highlights: [{ label: "a", text: "b" }, { label: "c", text: "d" }, { label: "e", text: "f" }],
+          summary: "要約です。",
+          key_points: ["ポイント1", "ポイント2"],
+        },
       },
       { title: "No Summary", url: "https://example.com/b", domain: "example.com", tags: [], excerpt: "抜粋です" },
     ],
@@ -33,12 +38,25 @@ describe("buildDigestMarkdown", () => {
   });
 
   it("最後に使用量を出力する", () => {
-    expect(markdown.endsWith("---\n\n*🤖 Claude Code 使用量: claude-sonnet-5・3 回呼び出し・API 換算で約 $0.50(サブスクリプションの枠内のため実際の請求はありません)*\n")).toBe(true);
+    expect(markdown.endsWith("---\n\n*🤖 Claude Code 使用量: claude-sonnet-5・3 回呼び出し・API 換算で約 $0.50*\n")).toBe(true);
   });
 });
 
 describe("digestFilePath", () => {
   it("年ごとのディレクトリに日付ファイル名で置く", () => {
     expect(digestFilePath("digests", "2026-09-27")).toBe("digests/2026/2026-09-27.md");
+  });
+});
+
+describe("githubFileUrl", () => {
+  it("GitHub Actions の環境変数からファイルの URL を作る", () => {
+    const env = { GITHUB_SERVER_URL: "https://github.com", GITHUB_REPOSITORY: "zaki-yama/raindrop-slack-digest", GITHUB_REF_NAME: "main" };
+    expect(githubFileUrl("digests/2026/2026-09-27.md", env)).toBe(
+      "https://github.com/zaki-yama/raindrop-slack-digest/blob/main/digests/2026/2026-09-27.md",
+    );
+  });
+
+  it("GitHub Actions 以外では undefined", () => {
+    expect(githubFileUrl("digests/2026/2026-09-27.md", {})).toBeUndefined();
   });
 });
