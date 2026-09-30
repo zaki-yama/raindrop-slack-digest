@@ -7,7 +7,7 @@ describe("buildDigestMarkdown", () => {
     intro: "今日は TypeScript の話題です。\n2行目",
     entries: [
       {
-        title: "Original [Title]", url: "https://example.com/a_(b)", domain: "example.com", tags: ["ts"], excerpt: "",
+        title: "Original [Title]", url: "https://example.com/a_(b)", domain: "example.com", tags: ["ts"], excerpt: "", bodyFetched: true,
         summary: {
           tldr: "一言要約",
           highlights: [{ label: "a", text: "b" }, { label: "c", text: "d" }, { label: "e", text: "f" }],
@@ -15,7 +15,10 @@ describe("buildDigestMarkdown", () => {
           key_points: ["ポイント1", "ポイント2"],
         },
       },
-      { title: "No Summary", url: "https://example.com/b", domain: "example.com", tags: [], excerpt: "抜粋です" },
+      {
+        title: "No Body", url: "https://example.com/b", domain: "example.com", tags: [], excerpt: "Excerpt",
+        bodyFetched: false, excerptTldr: "抜粋からの紹介です",
+      },
     ],
     usage: { calls: 3, costUsd: 0.5, models: ["claude-sonnet-5"] },
   });
@@ -33,8 +36,10 @@ describe("buildDigestMarkdown", () => {
     expect(markdown).not.toContain("🎯");
   });
 
-  it("要約がない記事は抜粋を出力する", () => {
-    expect(markdown).toContain("## 2. [No Summary](<https://example.com/b>)\n\nexample.com\n\n抜粋です");
+  it("本文を取得できなかった記事は一言紹介と注記だけを出力する", () => {
+    expect(markdown).toContain(
+      "## 2. [No Body](<https://example.com/b>)\n\nexample.com\n\n抜粋からの紹介です\n\n*⚠️ 本文を取得できなかったため、抜粋をもとにした紹介です*\n\n---",
+    );
   });
 
   it("最後に使用量を出力する", () => {

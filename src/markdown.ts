@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { formatDate, formatUsage, type Digest, type DigestEntry } from "./slack.js";
+import { entryNotice, fallbackText, formatDate, formatUsage, type Digest, type DigestEntry } from "./slack.js";
 
 /** リンクテキスト内で Markdown の構文として解釈される角括弧をエスケープする */
 function escapeLinkText(text: string): string {
@@ -21,9 +21,12 @@ function renderEntry(entry: DigestEntry, index: number): string {
     if (summary.key_points.length > 0) {
       lines.push(...summary.key_points.map((p) => `- ${singleLine(p)}`), "");
     }
-  } else if (entry.excerpt) {
-    lines.push(entry.excerpt, "");
+  } else {
+    const text = fallbackText(entry);
+    if (text) lines.push(text, "");
   }
+  const notice = entryNotice(entry);
+  if (notice) lines.push(`*${notice}*`, "");
   if (entry.tags.length > 0) lines.push(`**🏷️ タグ:** ${entry.tags.map((t) => `\`#${t}\``).join(" ")}`);
 
   return lines.join("\n").trimEnd();
