@@ -1,7 +1,7 @@
 # raindrop-slack-digest
 
 [Raindrop.io](https://raindrop.io) にストックした技術記事を Claude で要約し、ニュースレター形式で Slack に投稿する Bot です。
-GitHub Actions で毎日 9:00 JST に前日分を配信するので、サーバーは不要です。
+GitHub Actions で毎日 7:00 JST に前日分を配信するので、サーバーは不要です。
 配信した内容は Markdown としてこのリポジトリの [`digests/`](digests/) にもコミットされ、あとから読み返せます。
 
 ## 仕組み
