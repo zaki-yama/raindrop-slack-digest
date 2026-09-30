@@ -6,6 +6,10 @@ describe("previousDateJst", () => {
     expect(previousDateJst(new Date("2026-09-28T00:00:00Z"))).toBe("2026-09-27");
   });
 
+  it("定期実行の JST 7:00(前日 22:00 UTC)に実行すると、JST での前日を返す", () => {
+    expect(previousDateJst(new Date("2026-09-29T22:00:00Z"))).toBe("2026-09-29");
+  });
+
   it("UTC では前日でも JST で日付が変わっていればその前日を返す", () => {
     // 2026-09-28 00:30 JST
     expect(previousDateJst(new Date("2026-09-27T15:30:00Z"))).toBe("2026-09-27");
