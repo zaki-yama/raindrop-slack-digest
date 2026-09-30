@@ -7,6 +7,7 @@ const entry = (n: number, withSummary = true): DigestEntry => ({
   domain: "example.com",
   tags: ["typescript"],
   excerpt: "excerpt",
+  bodyFetched: withSummary,
   summary: withSummary
     ? {
         tldr: "一言 & 要約",
@@ -44,8 +45,26 @@ describe("buildEntryBlocks", () => {
     expect(context).not.toContain("🎯");
   });
 
-  it("要約がない場合は抜粋を載せる", () => {
-    expect(textOf(buildEntryBlocks(entry(2, false), 1)[0])).toBe("*2. <https://example.com/2|Original &lt;Title&gt;│2>*\nexcerpt");
+  it("本文を取得できなかった記事は、抜粋からの一言紹介と注記だけにして箇条書きを出さない", () => {
+    const e = { ...entry(2, false), excerptTldr: "抜粋からの紹介" };
+    expect(textOf(buildEntryBlocks(e, 1)[0])).toBe(
+      "*2. <https://example.com/2|Original &lt;Title&gt;│2>*\n抜粋からの紹介\n_⚠️ 本文を取得できなかったため、抜粋をもとにした紹介です_",
+    );
+  });
+
+  it("抜粋からの紹介も作れなかった場合は抜粋そのものを載せる", () => {
+    expect(textOf(buildEntryBlocks(entry(2, false), 1)[0])).toBe(
+      "*2. <https://example.com/2|Original &lt;Title&gt;│2>*\nexcerpt\n_⚠️ 本文を取得できなかったため、抜粋をもとにした紹介です_",
+    );
+  });
+
+  it("本文は取得できたが要約に失敗した場合は、その旨を注記する", () => {
+    const e = { ...entry(3, false), bodyFetched: true };
+    expect(textOf(buildEntryBlocks(e, 2)[0])).toContain("_⚠️ 要約を生成できなかったため、抜粋のみ掲載しています_");
+  });
+
+  it("正常に要約できた記事には注記を付けない", () => {
+    expect(textOf(buildEntryBlocks(entry(1), 0)[0])).not.toContain("⚠️");
   });
 
   it("長すぎる本文は 3000 文字に切り詰める", () => {

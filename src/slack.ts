@@ -12,8 +12,12 @@ export interface DigestEntry {
   url: string;
   domain: string;
   tags: string[];
-  /** 要約に失敗した場合は undefined(抜粋だけ載せる) */
+  /** 記事本文を取得できたか。取得できなかった記事は箇条書きを出さず、その旨を明示する */
+  bodyFetched: boolean;
+  /** 本文から作った要約。本文を取得できなかった場合や要約に失敗した場合は undefined */
   summary?: ArticleSummary;
+  /** 本文を取得できなかった記事について、抜粋から作った日本語の一言紹介 */
+  excerptTldr?: string;
   excerpt: string;
 }
 
@@ -60,6 +64,18 @@ export function formatDate(date: string): string {
   return date.replaceAll("-", "/");
 }
 
+/** 要約付きで紹介できなかった記事に添える注記。正常に要約できた記事は undefined */
+export function entryNotice(entry: DigestEntry): string | undefined {
+  if (!entry.bodyFetched) return "⚠️ 本文を取得できなかったため、抜粋をもとにした紹介です";
+  if (!entry.summary) return "⚠️ 要約を生成できなかったため、抜粋のみ掲載しています";
+  return undefined;
+}
+
+/** 要約がない記事に載せる一文(抜粋からの日本語紹介、なければ抜粋そのもの) */
+export function fallbackText(entry: DigestEntry): string | undefined {
+  return entry.excerptTldr ?? (entry.excerpt || undefined);
+}
+
 export function buildEntryBlocks(entry: DigestEntry, index: number): Block[] {
   const { summary } = entry;
   const lines = [`*${index + 1}. ${link(entry.url, entry.title)}*`];
@@ -67,9 +83,12 @@ export function buildEntryBlocks(entry: DigestEntry, index: number): Block[] {
     // Slack には短い版(一言要約 + 見出し語付きの3点)だけを載せ、詳しい版は GitHub の Markdown に残す
     lines.push(escapeMrkdwn(summary.tldr));
     lines.push(...summary.highlights.map((h) => `• *${escapeMrkdwn(h.label)}*: ${escapeMrkdwn(h.text)}`));
-  } else if (entry.excerpt) {
-    lines.push(escapeMrkdwn(entry.excerpt));
+  } else {
+    const text = fallbackText(entry);
+    if (text) lines.push(escapeMrkdwn(text));
   }
+  const notice = entryNotice(entry);
+  if (notice) lines.push(`_${escapeMrkdwn(notice)}_`);
 
   const context: string[] = [`🔗 ${escapeMrkdwn(entry.domain)}`];
   if (entry.tags.length > 0) context.push(`🏷️ ${entry.tags.map((t) => `#${escapeMrkdwn(t)}`).join(" ")}`);
