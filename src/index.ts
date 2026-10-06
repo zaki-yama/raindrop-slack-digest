@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { loadConfig } from "./config.js";
 import { dayRangeJst, previousDateJst } from "./dates.js";
 import { extractArticle } from "./extract.js";
@@ -62,6 +63,12 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const date = config.digestDate ?? previousDateJst(new Date());
   const { since, until } = dayRangeJst(date);
+  const filePath = digestFilePath(OUTPUT_DIR, date);
+
+  if (config.skipIfExists && existsSync(filePath)) {
+    console.log(`${date} のダイジェストは配信済みのためスキップします: ${filePath}`);
+    return;
+  }
 
   const raindrops = await fetchRecentRaindrops({
     token: config.raindropToken,
@@ -82,7 +89,6 @@ async function main(): Promise<void> {
   const entries = await mapWithConcurrency(raindrops, CONCURRENCY, (item) => buildEntry(item, usage));
   const intro = await writeIntro(entries.map((e) => ({ title: e.title, summary: e.summary?.tldr ?? e.excerptTldr })), usage);
 
-  const filePath = digestFilePath(OUTPUT_DIR, date);
   const digest: Digest = {
     date,
     intro,

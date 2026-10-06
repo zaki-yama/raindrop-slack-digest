@@ -1,7 +1,7 @@
 # raindrop-slack-digest
 
 [Raindrop.io](https://raindrop.io) にストックした技術記事を Claude で要約し、ニュースレター形式で Slack に投稿する Bot です。
-GitHub Actions で毎日 7:00 JST に前日分を配信するので、サーバーは不要です。
+毎朝 7:00 JST に前日分を GitHub Actions で配信するので、サーバーは不要です(起動には無料の外部定期実行サービスを使います)。
 配信した内容は Markdown としてこのリポジトリの [`digests/`](digests/) にもコミットされ、あとから読み返せます。
 
 ## 仕組み
@@ -65,9 +65,47 @@ Actions タブの **Raindrop Slack Digest** → **Run workflow** から手動実
 - `dry_run`: Slack への投稿も Markdown のコミットもせず、生成した Markdown と Block Kit JSON をログに出力します
   (JSON を [Block Kit Builder](https://app.slack.com/block-kit-builder) に貼るとプレビューできます)
 
+### 4. 毎朝 7:00 に配信する
+
+GitHub Actions の定期実行(`schedule`)は、混雑すると数時間遅れることがあります(実際に 7:00 指定で 9〜10 時台に起動していました)。
+そこで、無料の外部定期実行サービス [cron-job.org](https://cron-job.org/) から毎朝 7:00 にワークフローを起動します。
+
+ワークフローの `schedule`(9:13 JST)は、外部サービスが止まったときの保険として残しています。
+その日のダイジェストがすでに配信済み(`digests/` に Markdown がある)なら何もしないので、二重に投稿されることはありません。
+
+#### 4-1. GitHub のトークンを発行する
+
+1. GitHub の [Fine-grained personal access tokens](https://github.com/settings/personal-access-tokens/new) を開く
+2. 次のように設定して発行する
+   - **Token name**: `raindrop-slack-digest trigger` など
+   - **Expiration**: 任意(最長 1 年。期限が切れると配信が止まるので、カレンダー等で更新を忘れないように)
+   - **Repository access**: *Only select repositories* → `raindrop-slack-digest`
+   - **Permissions** → **Repository permissions** → **Actions**: *Read and write*(他は不要)
+3. 表示されたトークン(`github_pat_...`)を控える
+
+#### 4-2. cron-job.org にジョブを登録する
+
+1. [cron-job.org](https://cron-job.org/) に無料登録し、**CREATE CRONJOB** を開く
+2. **COMMON** タブ
+   - **URL**: `https://api.github.com/repos/zaki-yama/raindrop-slack-digest/actions/workflows/digest.yml/dispatches`
+   - **Execution schedule**: *Every day at* `7:00`
+   - タイムゾーンが `Asia/Tokyo` になっていることを確認(右上のアカウント設定、またはジョブの **ADVANCED** タブ)
+3. **ADVANCED** タブ
+   - **Request method**: `POST`
+   - **Headers**:
+     | Key | Value |
+     | --- | --- |
+     | `Authorization` | `Bearer <4-1 のトークン>` |
+     | `Accept` | `application/vnd.github+json` |
+     | `X-GitHub-Api-Version` | `2022-11-28` |
+   - **Request body**: `{"ref":"main"}`
+4. 保存後、**TEST RUN** を実行して、レスポンスが `204 No Content` になり、GitHub の Actions タブにワークフローの実行が現れることを確認する
+
+> TEST RUN は実際に前日分を配信します。試すだけなら、Request body を一時的に `{"ref":"main","inputs":{"dry_run":"true"}}` にすると Slack への投稿とコミットをしません(確認後に元に戻してください)。
+
 ### 補足
 
-- 配信時刻を変えたい場合は `.github/workflows/digest.yml` の `cron` を編集してください(UTC 表記)。GitHub Actions の定期実行は混雑時に数分〜数十分遅れることがあります
+- 配信時刻は、外部の定期実行サービス側の設定で変えられます(上記「4. 毎朝 7:00 に配信する」)
 - Markdown はワークフローがデフォルトブランチへ直接 push します(`permissions: contents: write`)。ブランチ保護で直接 push を禁止している場合は、`github-actions[bot]` を許可するなどの設定が必要です
 - Slack への投稿に失敗した場合も、書き出せた Markdown はコミットされます(ジョブは失敗扱いになります)
 
