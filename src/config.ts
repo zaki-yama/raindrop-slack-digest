@@ -9,6 +9,8 @@ export interface Config {
   digestDate: string | undefined;
   maxArticles: number;
   dryRun: boolean;
+  /** 対象日の Markdown がすでにあれば(= 配信済みなら)何もしない */
+  skipIfExists: boolean;
 }
 
 function required(name: string, env: NodeJS.ProcessEnv): string {
@@ -46,5 +48,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     digestDate: optionalDate("DIGEST_DATE", env),
     maxArticles: integer("MAX_ARTICLES", env, 20),
     dryRun,
+    skipIfExists: env.SKIP_IF_EXISTS === "1" || env.SKIP_IF_EXISTS === "true",
   };
 }

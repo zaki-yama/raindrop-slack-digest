@@ -1,9 +1,12 @@
 name: Raindrop Slack Digest
 
 on:
+  # 毎朝 7:00 JST の配信は、外部の定期実行サービス(cron-job.org など)から
+  # workflow_dispatch を呼び出して起動する(README の「毎朝 7:00 に配信する」を参照)。
+  # GitHub の schedule は数時間遅れることがあるため、外部サービスが止まったときの保険としてだけ使う。
+  # その日の分がすでに配信済みなら何もしない。
   schedule:
-    # 毎日 7:00 JST(前日 22:00 UTC)に前日分を配信
-    - cron: "0 22 * * *"
+    - cron: "13 0 * * *" # 9:13 JST(遅れることがある)
   workflow_dispatch:
     inputs:
       date:
@@ -44,6 +47,8 @@ jobs:
           MAX_ARTICLES: ${{ vars.MAX_ARTICLES }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
           DIGEST_DATE: ${{ inputs.date }}
+          # 保険の schedule 実行では、配信済みの日を重複して投稿しない
+          SKIP_IF_EXISTS: ${{ github.event_name == 'schedule' && '1' || '' }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
       # Slack への投稿に失敗しても、書き出せた Markdown はコミットする
       - name: Commit digest markdown
